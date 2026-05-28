@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TelegramRAG</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    }
+    .card { max-width: 400px; width: 100%; border: none; border-radius: 1.5rem; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .pulse { animation: pulse 1.5s infinite; }
+  </style>
+</head>
+<body>
+  <div class="card shadow-lg p-4 text-center mx-3">
+    <div class="mb-3">
+      <i class="bi bi-search-heart text-primary" style="font-size:3rem"></i>
+    </div>
+    <h4 class="fw-bold mb-1">TelegramRAG</h4>
+    <p class="text-muted small mb-3">Поиск по истории Telegram чатов · Raspberry Pi</p>
+
+    <div class="d-flex align-items-center justify-content-center gap-2 mb-4 text-muted small">
+      <span class="status-dot bg-secondary pulse" id="dot"></span>
+      <span id="statusText">Проверка сервиса…</span>
+    </div>
+
+    <a href="http://rpi.local:8080" id="openBtn"
+       class="btn btn-primary btn-lg rounded-pill px-5 disabled mb-3">
+      <i class="bi bi-box-arrow-up-right me-2"></i>Открыть TelegramRAG
+    </a>
+
+    <div id="offlineHint" class="d-none alert alert-warning py-2 text-start small mb-0">
+      <strong>Сервис не запущен.</strong><br>
+      На RPi выполните:<br>
+      <code>sudo systemctl start telegram-rag</code>
+    </div>
+  </div>
+
+  <script>
+    const APP = 'http://rpi.local:8080';
+
+    async function check() {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 3000);
+      try {
+        const r = await fetch(APP + '/api/status', { signal: ctrl.signal });
+        clearTimeout(t);
+        if (!r.ok) { setOffline(); return; }
+        const s = await r.json();
+        document.getElementById('dot').className = 'status-dot bg-success';
+        document.getElementById('statusText').textContent =
+          `Работает · ${s.total_chunks.toLocaleString()} chunks · ${s.indexed} чат${s.indexed !== 1 ? 'а' : ''}`;
+        document.getElementById('openBtn').classList.remove('disabled');
+        document.getElementById('offlineHint').classList.add('d-none');
+      } catch {
+        clearTimeout(t);
+        setOffline();
+      }
+    }
+
+    function setOffline() {
+      document.getElementById('dot').className = 'status-dot bg-danger pulse';
+      document.getElementById('statusText').textContent = 'Сервис недоступен';
+      document.getElementById('openBtn').classList.add('disabled');
+      document.getElementById('offlineHint').classList.remove('d-none');
+    }
+
+    check();
+    setInterval(check, 5000);
+  </script>
+</body>
+</html>

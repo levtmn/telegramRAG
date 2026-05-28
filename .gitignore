@@ -1,0 +1,24 @@
+# ── Secrets ───────────────────────────────────────────────
+.env
+
+# ── Generated indexes & caches (rebuilt by scripts/index.py) ─
+db/
+bm25/
+data/
+
+# ── Per-chat data: raw exports, media, processed chunks ─────
+# Users drop their own Telegram exports into telegram-*/origin/.
+# Never commit anyone's chat data.
+telegram-*/
+chats/
+result.json
+lastid
+
+# ── Python ──────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pkl
+
+# ── Local agent / editor state ──────────────────────────────
+.claude/
+*.tmp.*

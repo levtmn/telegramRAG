@@ -1,0 +1,8 @@
+anthropic
+cohere
+qdrant-client
+rank-bm25
+python-dotenv
+fastapi
+uvicorn[standard]
+python-multipart

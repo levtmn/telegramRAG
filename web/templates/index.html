@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TelegramRAG</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    html, body { height: 100%; margin: 0; }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      background: #f0f2f5;
+      font-size: 15px;
+    }
+
+    /* ── chat area ── */
+    #chatArea {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+    }
+
+    /* ── message bubbles ── */
+    .msg-user {
+      display: flex;
+      justify-content: flex-end;
+    }
+    .msg-user .bubble {
+      background: #0d6efd;
+      color: #fff;
+      border-radius: 1.2rem 1.2rem 0.25rem 1.2rem;
+      padding: .55rem .9rem;
+      max-width: 78%;
+      word-break: break-word;
+      line-height: 1.5;
+    }
+
+    .msg-bot {
+      display: flex;
+      gap: .6rem;
+      align-items: flex-start;
+      max-width: 84%;
+    }
+    .msg-bot .avatar {
+      width: 32px; height: 32px;
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 1rem;
+      margin-top: 2px;
+    }
+    .msg-bot .bubble {
+      background: #fff;
+      border: 1px solid #e9ecef;
+      border-radius: 0.25rem 1.2rem 1.2rem 1.2rem;
+      padding: .7rem .9rem;
+      word-break: break-word;
+      line-height: 1.65;
+      flex: 1;
+      min-width: 0;
+    }
+    .msg-bot .bubble p:last-child { margin-bottom: 0; }
+    .msg-bot .bubble ul, .msg-bot .bubble ol { padding-left: 1.3rem; }
+
+    /* typing indicator */
+    .typing-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      background: #adb5bd;
+      border-radius: 50%;
+      animation: blink 1.2s infinite ease-in-out;
+    }
+    .typing-dot:nth-child(2) { animation-delay: .2s; }
+    .typing-dot:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink {
+      0%, 80%, 100% { opacity: .2; }
+      40%            { opacity: 1;   }
+    }
+
+    /* ── sources ── */
+    .source-chips { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .5rem; }
+    .source-chip {
+      font-size: .75rem;
+      padding: .15rem .55rem;
+      border-radius: 999px;
+      border: 1px solid #dee2e6;
+      background: #f8f9fa;
+      cursor: pointer;
+      transition: background .15s;
+      white-space: nowrap;
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .source-chip:hover { background: #e9ecef; }
+    .source-chip.active { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
+    .source-body {
+      font-size: .8rem;
+      white-space: pre-wrap;
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: .5rem;
+      padding: .6rem .8rem;
+      margin-top: .4rem;
+      max-height: 220px;
+      overflow-y: auto;
+      word-break: break-word;
+    }
+
+    /* ── filter bar ── */
+    #filterBar {
+      background: #fff;
+      border-top: 1px solid #e9ecef;
+      padding: .5rem 1rem;
+    }
+    #filterBar label { font-size: .72rem; color: #6c757d; margin-bottom: .1rem; display: block; }
+
+    /* ── input bar ── */
+    #inputBar {
+      background: #fff;
+      border-top: 1px solid #e9ecef;
+      padding: .65rem 1rem;
+    }
+    #queryInput { resize: none; max-height: 140px; border-radius: .75rem; }
+    #sendBtn { border-radius: .75rem; padding: .45rem .9rem; align-self: flex-end; }
+
+    /* ── navbar ── */
+    .navbar { z-index: 1030; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+
+    /* ── indexing progress bar ── */
+    #indexingBanner {
+      background: #fff3cd;
+      border-bottom: 1px solid #ffc107;
+      font-size: .82rem;
+      padding: .4rem 1rem;
+    }
+
+    /* ── toast ── */
+    #toastWrap { position: fixed; bottom: 80px; right: 1rem; z-index: 2000; min-width: 260px; }
+
+    /* ── history offcanvas ── */
+    #historyCanvas { width: 290px; }
+    #historyList { overflow-y: auto; }
+    .history-item {
+      cursor: pointer;
+      transition: background .12s;
+      border-left: 3px solid transparent;
+    }
+    .history-item:hover { background: #f8f9fa; }
+    .history-item.active { background: #eff6ff; border-left-color: #3b82f6; }
+    .offcanvas-footer {
+      padding: .75rem;
+      border-top: 1px solid #e9ecef;
+      display: flex;
+      gap: .5rem;
+    }
+
+    /* ── print ── */
+    @media print {
+      .navbar, #indexingBanner, #filterBar, #inputBar,
+      #toastWrap, .offcanvas, .modal, .modal-backdrop { display: none !important; }
+      #chatArea { overflow: visible !important; height: auto !important; flex: none !important; }
+      body { background: white !important; display: block !important; }
+      .source-chip { display: none !important; }
+      .source-body { display: block !important; max-height: none !important; }
+      .msg-bot, .msg-user { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navbar ──────────────────────────────────────────────────────────────── -->
+<nav class="navbar navbar-dark bg-dark px-3 py-2 flex-shrink-0">
+  <div class="d-flex align-items-center gap-2">
+    <button class="btn btn-outline-light btn-sm" style="border-radius:.6rem; padding:.3rem .55rem"
+            data-bs-toggle="offcanvas" data-bs-target="#historyCanvas"
+            onclick="loadHistory()" title="История">
+      <i class="bi bi-clock-history"></i>
+    </button>
+    <span class="navbar-brand fw-semibold mb-0 fs-6">
+      <i class="bi bi-search-heart text-primary me-1"></i>TelegramRAG
+    </span>
+  </div>
+  <div class="d-flex align-items-center gap-2 ms-auto">
+    <span id="statusBadge" class="badge bg-secondary fs-6 fw-normal">
+      <span class="spinner-border spinner-border-sm"></span>
+    </span>
+    <button class="btn btn-outline-light btn-sm" onclick="newChat()" title="Новый чат">
+      <i class="bi bi-plus-lg me-1"></i>Новый
+    </button>
+    <button class="btn btn-outline-light btn-sm"
+            data-bs-toggle="modal" data-bs-target="#projectsModal">
+      <i class="bi bi-folder2-open me-1"></i>Проекты
+    </button>
+  </div>
+</nav>
+
+<!-- ── Indexing banner ───────────────────────────────────────────────────────── -->
+<div id="indexingBanner" class="d-none flex-shrink-0">
+  <div class="d-flex align-items-center gap-2">
+    <div class="spinner-border spinner-border-sm text-warning"></div>
+    <span id="indexingMsg">Идёт индексирование…</span>
+    <div class="ms-auto" id="indexingProgress" style="min-width:140px"></div>
+  </div>
+</div>
+
+<!-- ── Chat area ─────────────────────────────────────────────────────────────── -->
+<div id="chatArea">
+  <div id="emptyState" class="text-center text-muted mt-auto mb-auto py-5">
+    <i class="bi bi-chat-square-dots fs-1 d-block mb-2 opacity-25"></i>
+    <p class="mb-1 fw-semibold">Задайте вопрос</p>
+    <small>Спрашивайте на русском, как в разговоре.</small>
+  </div>
+</div>
+
+<!-- ── Filter bar ────────────────────────────────────────────────────────────── -->
+<div id="filterBar" class="flex-shrink-0 collapse">
+  <div class="row g-2">
+    <div class="col-12 col-sm-4">
+      <label>Чат</label>
+      <select class="form-select form-select-sm" id="chatFilter">
+        <option value="">Все чаты</option>
+      </select>
+    </div>
+    <div class="col-6 col-sm-4">
+      <label>Дата с</label>
+      <input type="date" class="form-control form-control-sm" id="dateFrom">
+    </div>
+    <div class="col-6 col-sm-4">
+      <label>Дата по</label>
+      <input type="date" class="form-control form-control-sm" id="dateTo">
+    </div>
+  </div>
+</div>
+
+<!-- ── Input bar ─────────────────────────────────────────────────────────────── -->
+<div id="inputBar" class="flex-shrink-0">
+  <div class="d-flex gap-2 align-items-end">
+    <button class="btn btn-sm btn-outline-secondary" style="border-radius:.75rem; padding:.43rem .6rem"
+            id="filterToggle" onclick="toggleFilters()" title="Фильтры">
+      <i class="bi bi-funnel"></i>
+    </button>
+    <textarea id="queryInput" class="form-control"
+              rows="1" placeholder="Спросите о чём-нибудь из чатов…"></textarea>
+    <button id="sendBtn" class="btn btn-primary" onclick="submitQuery()">
+      <i class="bi bi-send-fill"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ── Toast ──────────────────────────────────────────────────────────────────── -->
+<div id="toastWrap">
+  <div id="mainToast" class="toast border-0 shadow" role="alert">
+    <div class="d-flex">
+      <div id="toastBody" class="toast-body fw-semibold"></div>
+      <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ── History offcanvas ──────────────────────────────────────────────────────── -->
+<div class="offcanvas offcanvas-start" id="historyCanvas" tabindex="-1">
+  <div class="offcanvas-header border-bottom py-2">
+    <h6 class="offcanvas-title fw-semibold mb-0">
+      <i class="bi bi-clock-history me-2 text-primary"></i>История
+    </h6>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body p-0" id="historyList">
+    <div class="text-center py-4 text-muted small">Загрузка…</div>
+  </div>
+  <div class="offcanvas-footer">
+    <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="clearHistory()">
+      <i class="bi bi-trash3 me-1"></i>Очистить
+    </button>
+    <button class="btn btn-sm btn-outline-secondary flex-grow-1" onclick="window.print()">
+      <i class="bi bi-printer me-1"></i>PDF
+    </button>
+  </div>
+</div>
+
+<!-- ── Projects modal ─────────────────────────────────────────────────────────── -->
+<div class="modal fade" id="projectsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-semibold">
+          <i class="bi bi-folder2-open me-2 text-primary"></i>Проекты
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Upload form (collapsible) -->
+      <div id="uploadSection" class="d-none border-bottom bg-light">
+        <div class="p-3">
+          <div class="fw-semibold small mb-2">
+            <i class="bi bi-cloud-upload me-1 text-primary"></i>Загрузить архив чата
+          </div>
+          <div class="row g-2">
+            <div class="col-12 col-sm-6">
+              <label class="form-label small mb-1">Архив (.zip или .tar.gz)</label>
+              <input type="file" class="form-control form-control-sm" id="uploadFile"
+                     accept=".zip,.gz,.tgz">
+              <div class="form-text" style="font-size:.7rem">Архив должен содержать result.json в корне.</div>
+            </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label small mb-1">Название чата</label>
+              <input type="text" class="form-control form-control-sm" id="uploadName"
+                     placeholder="Рабочий чат 2025">
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2 mt-2">
+            <button class="btn btn-primary btn-sm" id="uploadBtn" onclick="uploadProject()">
+              <i class="bi bi-upload me-1"></i>Загрузить
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="toggleUploadSection()">
+              Отмена
+            </button>
+            <span id="uploadStatus" class="small ms-1"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-body p-0" id="projectsList">
+        <div class="text-center py-4"><div class="spinner-border"></div></div>
+      </div>
+
+      <div class="modal-footer justify-content-between bg-light">
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary btn-sm" onclick="toggleUploadSection()">
+            <i class="bi bi-upload me-1"></i>Загрузить архив
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="loadProjects()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Обновить
+          </button>
+        </div>
+        <small class="text-muted d-none d-sm-block">
+          Или создайте <code>telegram-{name}/origin/</code> с <code>result.json</code>
+        </small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+'use strict';
+
+// ── Session management ────────────────────────────────────────────────────────
+// crypto.randomUUID() only exists in secure contexts (HTTPS or localhost).
+// Over plain HTTP on rpi.local it's undefined, so use a getRandomValues fallback
+// (getRandomValues IS available in non-secure contexts).
+function genUUID() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  const b = new Uint8Array(16);
+  (window.crypto && crypto.getRandomValues ? crypto.getRandomValues(b)
+    : b.forEach((_, i) => b[i] = Math.floor(Math.random() * 256)));
+  b[6] = (b[6] & 0x0f) | 0x40;  // version 4
+  b[8] = (b[8] & 0x3f) | 0x80;  // variant
+  const h = [...b].map(x => x.toString(16).padStart(2, '0'));
+  return `${h[0]}${h[1]}${h[2]}${h[3]}-${h[4]}${h[5]}-${h[6]}${h[7]}-${h[8]}${h[9]}-${h[10]}${h[11]}${h[12]}${h[13]}${h[14]}${h[15]}`;
+}
+
+let currentSessionId = genUUID();
+let msgCounter = 0;
+let _projectMeta = {};   // chat_name → {date_min, date_max}
+
+function newChat() {
+  currentSessionId = genUUID();
+  msgCounter = 0;
+  document.getElementById('chatArea').innerHTML = `
+    <div id="emptyState" class="text-center text-muted mt-auto mb-auto py-5">
+      <i class="bi bi-chat-square-dots fs-1 d-block mb-2 opacity-25"></i>
+      <p class="mb-1 fw-semibold">Задайте вопрос</p>
+      <small>Спрашивайте на русском, как в разговоре.</small>
+    </div>`;
+}
+
+// ── SSE helper ────────────────────────────────────────────────────────────────
+async function streamSSE(url, body, onEvent) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      try { onEvent(JSON.parse(line.slice(6))); } catch {}
+    }
+  }
+}
+
+// ── Render helpers ────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+}
+
+function scrollChatBottom() {
+  const area = document.getElementById('chatArea');
+  area.scrollTop = area.scrollHeight;
+}
+
+function hideEmpty() {
+  const e = document.getElementById('emptyState');
+  if (e) e.style.display = 'none';
+}
+
+function formatDate(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('ru-RU', {day:'numeric', month:'short', year:'numeric'});
+  } catch { return iso.slice(0, 10); }
+}
+
+// ── Message rendering ─────────────────────────────────────────────────────────
+function appendUserMsg(text) {
+  hideEmpty();
+  const id = ++msgCounter;
+  const div = document.createElement('div');
+  div.className = 'msg-user';
+  div.id = `msg-${id}`;
+  div.innerHTML = `<div class="bubble">${esc(text)}</div>`;
+  document.getElementById('chatArea').appendChild(div);
+  scrollChatBottom();
+  return id;
+}
+
+function appendTypingIndicator() {
+  hideEmpty();
+  const id = ++msgCounter;
+  const div = document.createElement('div');
+  div.className = 'msg-bot';
+  div.id = `msg-${id}`;
+  div.innerHTML = `
+    <div class="avatar"><i class="bi bi-robot"></i></div>
+    <div class="bubble">
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
+    </div>`;
+  document.getElementById('chatArea').appendChild(div);
+  scrollChatBottom();
+  return id;
+}
+
+function _sourcesHtml(sources, msgId) {
+  if (!sources || !sources.length) return '';
+  return `<div class="source-chips">` +
+    sources.map((s, i) =>
+      `<span class="source-chip" onclick="toggleSource(this,'src-${msgId}-${i}')"
+             title="${esc(s.chat_name)} · ${esc(s.date_start)} · ${esc((s.authors||[]).join(', '))}">
+         <i class="bi bi-journals me-1"></i>${esc(s.chat_name)} <span class="text-muted">·</span> ${esc(s.date_start)}
+       </span>`
+    ).join('') + `</div>` +
+    sources.map((s, i) =>
+      `<div id="src-${msgId}-${i}" class="source-body d-none">${esc(s.text)}</div>`
+    ).join('');
+}
+
+function updateBotMsg(id, htmlContent, sources) {
+  const el = document.getElementById(`msg-${id}`);
+  if (!el) return;
+  el.innerHTML = `
+    <div class="avatar"><i class="bi bi-robot"></i></div>
+    <div class="bubble">
+      <div>${htmlContent}</div>
+      ${_sourcesHtml(sources, id)}
+    </div>`;
+  scrollChatBottom();
+}
+
+function appendCompleteBotMsg(htmlContent, sources) {
+  hideEmpty();
+  const id = ++msgCounter;
+  const div = document.createElement('div');
+  div.className = 'msg-bot';
+  div.id = `msg-${id}`;
+  document.getElementById('chatArea').appendChild(div);
+  updateBotMsg(id, htmlContent, sources);
+  return id;
+}
+
+function setBotError(id, msg) {
+  const el = document.getElementById(`msg-${id}`);
+  if (!el) return;
+  el.innerHTML = `
+    <div class="avatar text-danger"><i class="bi bi-exclamation-circle"></i></div>
+    <div class="bubble border-danger-subtle">
+      <span class="text-danger">${esc(msg)}</span>
+    </div>`;
+}
+
+function toggleSource(chip, srcId) {
+  const body = document.getElementById(srcId);
+  if (!body) return;
+  const open = !body.classList.contains('d-none');
+  body.classList.toggle('d-none', open);
+  chip.classList.toggle('active', !open);
+}
+
+// ── Query submission ──────────────────────────────────────────────────────────
+async function submitQuery() {
+  const input = document.getElementById('queryInput');
+  const query = input.value.trim();
+  if (!query) return;
+
+  input.value = '';
+  autoGrow(input);
+  document.getElementById('sendBtn').disabled = true;
+
+  appendUserMsg(query);
+  const botId = appendTypingIndicator();
+  let tokens = '';
+  let sources = null;
+
+  await streamSSE('/api/query', {
+    query,
+    date_from:  document.getElementById('dateFrom').value || null,
+    date_to:    document.getElementById('dateTo').value || null,
+    chat_id:    document.getElementById('chatFilter').value || null,
+    session_id: currentSessionId,
+  }, ev => {
+    switch (ev.type) {
+      case 'sources':
+        sources = ev.chunks;
+        break;
+      case 'token':
+        tokens += ev.text;
+        updateBotMsg(botId, marked.parse(tokens), sources);
+        break;
+      case 'done':
+        updateBotMsg(botId, marked.parse(tokens), sources);
+        break;
+      case 'error':
+        setBotError(botId, ev.message);
+        break;
+    }
+  });
+
+  document.getElementById('sendBtn').disabled = false;
+  input.focus();
+}
+
+// ── Filters toggle ────────────────────────────────────────────────────────────
+function toggleFilters() {
+  const bar = document.getElementById('filterBar');
+  const btn = document.getElementById('filterToggle');
+  const open = bar.classList.contains('show');
+  bootstrap.Collapse.getOrCreateInstance(bar).toggle();
+  btn.classList.toggle('btn-outline-secondary', open);
+  btn.classList.toggle('btn-secondary', !open);
+}
+
+// ── Chat filter auto-fill date range ─────────────────────────────────────────
+document.getElementById('chatFilter').addEventListener('change', function() {
+  const meta = _projectMeta[this.value];
+  if (meta && this.value) {
+    document.getElementById('dateFrom').value = meta.date_min || '';
+    document.getElementById('dateTo').value   = meta.date_max || '';
+    // Auto-open filter bar to make the dates visible
+    const bar = document.getElementById('filterBar');
+    if (!bar.classList.contains('show')) {
+      bootstrap.Collapse.getOrCreateInstance(bar).show();
+      document.getElementById('filterToggle').classList.replace('btn-outline-secondary', 'btn-secondary');
+    }
+  } else if (!this.value) {
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value   = '';
+  }
+});
+
+// ── Input auto-grow + Enter to send ──────────────────────────────────────────
+document.getElementById('queryInput').addEventListener('input', function() {
+  autoGrow(this);
+});
+document.getElementById('queryInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    submitQuery();
+  }
+});
+
+// ── Toast helper ──────────────────────────────────────────────────────────────
+function showToast(message, type = 'success') {
+  const body = document.getElementById('toastBody');
+  const toast = document.getElementById('mainToast');
+  body.textContent = message;
+  toast.className = `toast border-0 shadow text-bg-${type}`;
+  bootstrap.Toast.getOrCreateInstance(toast, { delay: 5000 }).show();
+}
+
+// ── Browser notifications ─────────────────────────────────────────────────────
+function requestNotifPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function sendBrowserNotif(title, body) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, { body, icon: '' });
+  }
+}
+
+document.addEventListener('click', requestNotifPermission, { once: true });
+
+// ── Indexing status polling ───────────────────────────────────────────────────
+let _poller = null;
+
+function startPolling() {
+  if (_poller) return;
+  _poller = setInterval(pollIndexing, 2000);
+}
+
+function stopPolling() {
+  clearInterval(_poller);
+  _poller = null;
+}
+
+async function pollIndexing() {
+  const s = await fetch('/api/indexing-status').then(r => r.json()).catch(() => null);
+  if (!s) return;
+
+  const banner = document.getElementById('indexingBanner');
+  const msg    = document.getElementById('indexingMsg');
+  const prog   = document.getElementById('indexingProgress');
+
+  if (s.running) {
+    banner.classList.remove('d-none');
+    msg.textContent = s.message || 'Индексирование…';
+
+    if (s.step === 'embed' && s.total > 0) {
+      const pct = Math.round(s.progress / s.total * 100);
+      prog.innerHTML = `
+        <div class="progress" style="height:6px">
+          <div class="progress-bar bg-warning" style="width:${pct}%"></div>
+        </div>
+        <small class="text-muted">${s.progress} / ${s.total} chunks</small>`;
+    } else {
+      prog.innerHTML = '';
+    }
+
+    updateProjectRowStatus(s);
+  } else {
+    banner.classList.add('d-none');
+    prog.innerHTML = '';
+    stopPolling();
+
+    if (s.completed) {
+      const note = `Готово! ${s.total_chunks} чанков проиндексировано.`;
+      showToast(note, 'success');
+      sendBrowserNotif('TelegramRAG', note);
+      loadStatus();
+      loadProjects();
+    } else if (s.error) {
+      showToast(`Ошибка: ${s.error}`, 'danger');
+      sendBrowserNotif('TelegramRAG — Ошибка', s.error);
+      loadProjects();
+    }
+  }
+}
+
+function updateProjectRowStatus(s) {
+  const row = document.getElementById(`prog-${s.project}`);
+  if (!row) return;
+  const steps = { preprocess: 'Парсинг', embed: 'Эмбеддинг', qdrant: 'Vector DB', bm25: 'BM25' };
+  const icon = s.step === 'error' ? '❌' : s.step === 'done' ? '✅' : '⏳';
+  row.textContent = `${icon} ${steps[s.step] || s.step}: ${s.message}`;
+}
+
+// ── Status badge ──────────────────────────────────────────────────────────────
+async function loadStatus() {
+  const s = await fetch('/api/status').then(r => r.json()).catch(() => null);
+  if (!s) return;
+  const badge = document.getElementById('statusBadge');
+  if (s.indexing) {
+    badge.className = 'badge bg-warning text-dark fs-6 fw-normal';
+    badge.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Индексирование…';
+    startPolling();
+  } else if (s.db_exists && s.total_chunks > 0) {
+    badge.className = 'badge bg-success fs-6 fw-normal';
+    badge.innerHTML = `<i class="bi bi-check-circle me-1"></i>${s.total_chunks} chunks · ${s.indexed} чат${s.indexed !== 1 ? 'а' : ''}`;
+  } else {
+    badge.className = 'badge bg-secondary fs-6 fw-normal';
+    badge.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i>Не проиндексировано';
+  }
+}
+
+// ── Projects modal ────────────────────────────────────────────────────────────
+async function loadProjects() {
+  document.getElementById('projectsList').innerHTML =
+    '<div class="text-center py-4"><div class="spinner-border"></div></div>';
+
+  const projects = await fetch('/api/projects').then(r => r.json());
+
+  // Sync chat dropdown + build meta map for date auto-fill
+  _projectMeta = {};
+  const sel = document.getElementById('chatFilter');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Все чаты</option>';
+  projects.filter(p => p.indexed).forEach(p => {
+    const key = p.chat_name || p.dir;
+    _projectMeta[key] = { date_min: p.date_min, date_max: p.date_max };
+    const o = document.createElement('option');
+    o.value = p.chat_name || p.dir;
+    o.textContent = p.display_name || p.name;
+    sel.appendChild(o);
+  });
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+
+  if (!projects.length) {
+    document.getElementById('projectsList').innerHTML =
+      '<p class="text-muted p-3 mb-0">Проекты не найдены.</p>';
+    return;
+  }
+
+  document.getElementById('projectsList').innerHTML = projects.map(p => {
+    const dateRange = (p.date_min && p.date_max)
+      ? `<span class="me-2"><i class="bi bi-calendar2-range me-1"></i>${p.date_min} — ${p.date_max}</span>`
+      : '';
+    const statusHtml = p.indexed
+      ? `<i class="bi bi-check-circle-fill text-success me-1"></i>${p.chunk_count} chunks${p.cached ? ' · cache ✓' : ''}`
+      : p.preprocessed
+        ? '<i class="bi bi-clock text-warning me-1"></i>Обработан, не проиндексирован'
+        : p.has_export
+          ? '<i class="bi bi-dot text-secondary"></i>Экспорт найден'
+          : '<i class="bi bi-exclamation-circle text-danger me-1"></i>Нет result.json';
+    return `
+    <div class="d-flex align-items-start gap-3 p-3 border-bottom">
+      <div class="flex-grow-1">
+        <div class="d-flex align-items-center gap-1 flex-wrap">
+          <span class="fw-semibold">${esc(p.display_name || p.name)}</span>
+          <button class="btn btn-sm btn-link p-0 text-muted"
+                  onclick="editDisplayName('${esc(p.name)}','${esc(p.display_name || p.name)}')"
+                  title="Изменить название">
+            <i class="bi bi-pencil" style="font-size:.72rem"></i>
+          </button>
+        </div>
+        <div class="small text-muted mt-1">
+          ${dateRange}${statusHtml}
+        </div>
+        <div id="prog-${esc(p.name)}" class="small mt-1 text-muted"></div>
+      </div>
+      <div class="pt-1 flex-shrink-0">
+        ${p.has_export ? `
+          <button class="btn btn-sm ${p.indexed ? 'btn-outline-secondary' : 'btn-primary'}"
+                  onclick="indexProject('${esc(p.name)}')">
+            <i class="bi bi-${p.indexed ? 'arrow-repeat' : 'play-fill'} me-1"></i>
+            ${p.indexed ? 'Re-index' : 'Index'}
+          </button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function indexProject(name) {
+  const res = await fetch(`/api/projects/${encodeURIComponent(name)}/index`, { method: 'POST' });
+  const data = await res.json();
+  if (data.error) {
+    showToast(data.error, 'warning');
+    return;
+  }
+  showToast(`Индексирование "${name}" запущено в фоне.`, 'info');
+  startPolling();
+  loadStatus();
+}
+
+async function editDisplayName(name, current) {
+  const newName = prompt('Название чата:', current);
+  if (!newName || newName === current) return;
+  const res = await fetch(`/api/projects/${encodeURIComponent(name)}/metadata`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ display_name: newName }),
+  });
+  if (res.ok) {
+    showToast('Название обновлено', 'success');
+    loadProjects();
+  } else {
+    showToast('Ошибка обновления', 'danger');
+  }
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+function toggleUploadSection() {
+  const sec = document.getElementById('uploadSection');
+  sec.classList.toggle('d-none');
+  if (!sec.classList.contains('d-none')) {
+    document.getElementById('uploadFile').focus();
+  }
+}
+
+async function uploadProject() {
+  const fileInput  = document.getElementById('uploadFile');
+  const nameInput  = document.getElementById('uploadName');
+  const statusEl   = document.getElementById('uploadStatus');
+  const btn        = document.getElementById('uploadBtn');
+
+  if (!fileInput.files.length) {
+    statusEl.innerHTML = '<span class="text-danger">Выберите файл.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.textContent = 'Загрузка…';
+
+  const form = new FormData();
+  form.append('file', fileInput.files[0]);
+  form.append('display_name', nameInput.value.trim());
+
+  try {
+    const res = await fetch('/api/projects/upload', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.error) {
+      statusEl.innerHTML = `<span class="text-danger">${esc(data.error)}</span>`;
+    } else {
+      statusEl.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${esc(data.display_name)} добавлен</span>`;
+      fileInput.value = '';
+      nameInput.value = '';
+      setTimeout(() => {
+        document.getElementById('uploadSection').classList.add('d-none');
+        statusEl.textContent = '';
+      }, 2000);
+      loadProjects();
+    }
+  } catch (e) {
+    statusEl.innerHTML = `<span class="text-danger">Ошибка: ${esc(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+async function loadHistory() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<div class="text-center py-4 text-muted small">Загрузка…</div>';
+
+  const sessions = await fetch('/api/history').then(r => r.json()).catch(() => []);
+
+  if (!sessions.length) {
+    list.innerHTML = '<p class="text-muted p-3 mb-0 small">История пуста.</p>';
+    return;
+  }
+
+  list.innerHTML = sessions.map(s => `
+    <div class="d-flex align-items-center px-3 py-2 border-bottom history-item${s.id === currentSessionId ? ' active' : ''}"
+         onclick="loadSession('${esc(s.id)}')">
+      <div class="flex-grow-1 overflow-hidden me-2">
+        <div class="small fw-semibold text-truncate">${esc(s.title || '(без названия)')}</div>
+        <div class="text-muted text-truncate" style="font-size:.7rem">
+          ${formatDate(s.created_at)} · ${Math.floor(s.msg_count / 2)} вопрос${s.msg_count >= 4 ? 'а' : ''}
+        </div>
+      </div>
+      <button class="btn btn-sm btn-link text-danger p-0 flex-shrink-0 opacity-50"
+              style="font-size:.8rem"
+              onclick="event.stopPropagation(); deleteSession('${esc(s.id)}')"
+              title="Удалить"><i class="bi bi-trash3"></i></button>
+    </div>`).join('');
+}
+
+async function loadSession(id) {
+  const data = await fetch(`/api/history/${id}`).then(r => r.json()).catch(() => null);
+  if (!data) return;
+
+  bootstrap.Offcanvas.getInstance(document.getElementById('historyCanvas'))?.hide();
+
+  currentSessionId = id;
+  msgCounter = 0;
+
+  const area = document.getElementById('chatArea');
+  area.innerHTML = '';
+
+  for (const m of data.messages) {
+    if (m.role === 'user') {
+      appendUserMsg(m.content);
+    } else if (m.role === 'assistant') {
+      appendCompleteBotMsg(marked.parse(m.content || ''), m.sources || null);
+    }
+  }
+}
+
+async function clearHistory() {
+  if (!confirm('Очистить всю историю чатов?')) return;
+  await fetch('/api/history', { method: 'DELETE' });
+  loadHistory();
+  showToast('История очищена', 'info');
+}
+
+async function deleteSession(id) {
+  await fetch(`/api/history/${id}`, { method: 'DELETE' });
+  if (currentSessionId === id) newChat();
+  loadHistory();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.getElementById('projectsModal').addEventListener('show.bs.modal', loadProjects);
+loadStatus();
+loadProjects();  // pre-load to populate chat dropdown on page load
+
+fetch('/api/indexing-status').then(r => r.json()).then(s => {
+  if (s.running) startPolling();
+});
+
+</script>
+</body>
+</html>

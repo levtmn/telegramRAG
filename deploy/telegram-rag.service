@@ -1,0 +1,16 @@
+[Unit]
+Description=TelegramRAG Web Server
+After=network.target
+
+[Service]
+Type=simple
+User=user
+WorkingDirectory=/home/user/claude/analyze-json
+ExecStart=/usr/bin/python3 web/app.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
