@@ -2,10 +2,16 @@
 
 *Read this in other languages: [Русский](README.ru.md)*
 
-Local **Retrieval-Augmented Generation** over your Telegram group-chat exports. Ask questions in
-natural language and get answers grounded in the actual messages, with sources. Everything runs on
-your own machine — light enough for a **Raspberry Pi 5 (4 GB RAM)** — and uses only hosted APIs for
-the heavy ML (no local GPU, no `torch`, no multi-gigabyte models).
+Self-hosted **Retrieval-Augmented Generation** over your Telegram group-chat exports. Ask questions
+in natural language and get answers grounded in the actual messages, with sources. The application
+and indexes run on your machine; embeddings, reranking, and answer generation use hosted APIs
+(no local GPU, no `torch`, no multi-gigabyte models).
+
+**Privacy boundary:** the current version sends indexed chunk text and questions to Cohere, and
+questions plus selected excerpts to Anthropic. It is not an offline processing mode. A customer-
+deployment roadmap, including proposed local processing and messenger support boundaries, is
+documented in [Product readiness](docs/PRODUCT_READINESS.md). Project contributors should start
+with [AGENTS.md](AGENTS.md).
 
 Multiple chats can be indexed at once. Queries run **hybrid search** (dense vectors + BM25 keywords),
 fused with Reciprocal Rank Fusion, reranked, and answered by Claude — streamed token-by-token to a
