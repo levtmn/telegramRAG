@@ -1,0 +1,4 @@
+interface:
+  display_name: "Private Messenger RAG"
+  short_description: "Prepare private messenger RAG for customer deployment"
+  default_prompt: "Use $productize-messenger-rag to review this change for private customer deployment and supported messenger import formats."

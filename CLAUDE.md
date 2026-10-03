@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+For the commercial customer-deployment objective, privacy rules, and proposed messenger support scope, read [AGENTS.md](AGENTS.md) and [Product readiness](docs/PRODUCT_READINESS.md) first. The details below describe the original hosted-API prototype. Its application and storage run locally; message embeddings/reranking and answer generation send content to external providers. Device resource assumptions below do not establish requirements for fully local inference.
+
 ## Project goal
 
 Local RAG (Retrieval-Augmented Generation) system over Telegram group chat exports. Runs entirely on a Raspberry Pi 5 (aarch64, 4 GB RAM). Multiple chats can be indexed; queries run hybrid search (vector + BM25) with optional metadata filters and reranking.
